@@ -74,7 +74,7 @@ sudo apt-get install texlive-full
 pip install -r requirements.txt
 ```
 
-**Note:** Installing `texlive-full` can take a long time. You may need to [hold Enter](https://askubuntu.com/questions/956006/pregenerating-context-markiv-format-this-may-take-some-time-takes-forever) during the installation.
+**Note:** Installing `texlive-full` can take a long time. You may need to [hold Enter](https://askubuntu.com/questions/956006/pregenerating-context-markiv-format-this-may-take-forever) during the installation.
 
 ### Supported Models and API Keys
 
@@ -365,5 +365,338 @@ docker run -it -e OPENAI_API_KEY=$OPENAI_API_KEY \
 ```
 
 ## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=SakanaAI/AI-Scientist&type=Date)](https://star-history.com/#SakanaAI/AI-Scientist&Date)
+
+## 目次
+
+1. [はじめに](#はじめに)
+2. [要件](#要件)
+   - [インストール](#インストール)
+   - [サポートされているモデルとAPIキー](#サポートされているモデルとAPIキー)
+3. [テンプレートの設定](#テンプレートの設定)
+   - [NanoGPTテンプレート](#nanogptテンプレート)
+   - [2D Diffusionテンプレート](#2d-diffusionテンプレート)
+   - [Grokkingテンプレート](#grokkingテンプレート)
+4. [AI Scientistの論文生成実験を実行する](#ai-scientistの論文生成実験を実行する)
+5. [LLM生成の論文レビューを取得する](#llm生成の論文レビューを取得する)
+6. [独自のテンプレートを作成する](#独自のテンプレートを作成する)
+   - [コミュニティが提供するテンプレート](#コミュニティが提供するテンプレート)
+7. [テンプレートリソース](#テンプレートリソース)
+8. [AI Scientistの引用](#ai-scientistの引用)
+9. [よくある質問](#よくある質問)
+10. [コンテナ化](#コンテナ化)
+
+## はじめに
+
+私たちは、論文で使用した3つのテンプレートを提供しています。これらは、**NanoGPT**、**2D Diffusion**、および**Grokking**の領域をカバーしています。これらのテンプレートを使用して、AI Scientistがこれらの分野でアイデアを生成し、実験を行うことができます。コミュニティからの新しいテンプレートの貢献を受け付けていますが、これらは私たちによって維持されていないことに注意してください。提供された3つのテンプレート以外のすべてのテンプレートはコミュニティの貢献です。
+
+## 要件
+
+このコードは、CUDAとPyTorchを使用してNVIDIA GPUを搭載したLinuxで実行するように設計されています。他のGPUアーキテクチャのサポートは、[PyTorchのガイドライン](https://pytorch.org/get-started/locally/)に従うことで可能です。現在のテンプレートは、CPUのみのマシンでは実行に非常に長い時間がかかる可能性があります。他のオペレーティングシステムでの実行には、かなりの調整が必要です。
+
+### インストール
+
+```bash
+conda create -n ai_scientist python=3.11
+conda activate ai_scientist
+# pdflatexをインストール
+sudo apt-get install texlive-full
+
+# PyPIの要件をインストール
+pip install -r requirements.txt
+```
+
+**注:** `texlive-full`のインストールには時間がかかることがあります。インストール中に[Enterキーを押し続ける](https://askubuntu.com/questions/956006/pregenerating-context-markiv-format-this-may-take-forever)必要があるかもしれません。
+
+### サポートされているモデルとAPIキー
+
+私たちは、オープンウェイトモデルとAPI専用モデルを含むさまざまなモデルをサポートしています。一般的に、元のGPT-4の能力を超えるフロンティアモデルのみを使用することをお勧めします。サポートされているモデルの完全なリストについては、[こちら](https://github.com/SakanaAI/AI-Scientist/blob/main/ai_scientist/llm.py)を参照してください。
+
+#### OpenAI API (GPT-4o, GPT-4o-mini, o1モデル)
+
+デフォルトでは、`OPENAI_API_KEY`環境変数を使用します。
+
+#### Anthropic API (Claude Sonnet 3.5)
+
+デフォルトでは、`ANTHROPIC_API_KEY`環境変数を使用します。
+
+##### Bedrock経由のClaudeモデル
+
+[Amazon Bedrock](https://aws.amazon.com/bedrock/)が提供するClaudeモデルの場合、以下の追加パッケージをインストールしてください：
+
+```bash
+pip install anthropic[bedrock]
+```
+
+次に、有効な[AWS認証情報](https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html)とターゲット[AWSリージョン](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-regions.html)を指定します：
+
+環境変数を設定します：`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、`AWS_REGION_NAME`。
+
+##### Vertex AI経由のClaudeモデル
+
+[Vertex AI Model Garden](https://cloud.google.com/model-garden?hl=en)が提供するClaudeモデルの場合、以下の追加パッケージをインストールしてください：
+
+```bash
+pip install google-cloud-aiplatform
+pip install anthropic[vertex]
+```
+
+次に、有効な[Google Cloudプロジェクト](https://cloud.google.com/vertex-ai/docs/authentication)の認証を設定します。たとえば、リージョンとプロジェクトIDを提供します：
+
+```bash
+export CLOUD_ML_REGION="REGION"           # Model Gardenの呼び出し用
+export ANTHROPIC_VERTEX_PROJECT_ID="PROJECT_ID"  # Model Gardenの呼び出し用
+export VERTEXAI_LOCATION="REGION"         # Aider/LiteLLMの呼び出し用
+export VERTEXAI_PROJECT="PROJECT_ID"      # Aider/LiteLLMの呼び出し用
+```
+
+#### DeepSeek API (DeepSeek-Coder-V2)
+
+デフォルトでは、`DEEPSEEK_API_KEY`環境変数を使用します。
+
+#### OpenRouter API (Llama3.1)
+
+デフォルトでは、`OPENROUTER_API_KEY`環境変数を使用します。
+
+#### Semantic Scholar API (文献検索)
+
+私たちのコードは、オプションでSemantic Scholar APIキー（`S2_API_KEY`）を使用して、[高スループット](https://www.semanticscholar.org/product/api)を実現できますが、原則としてそれなしでも動作するはずです。Semantic Scholarに問題がある場合は、文献検索と論文生成の引用フェーズをスキップできます。
+
+使用するモデルのキーを必ず提供してください。例：
+
+```bash
+export OPENAI_API_KEY="YOUR KEY HERE"
+export S2_API_KEY="YOUR KEY HERE"
+```
+
+## テンプレートの設定
+
+このセクションでは、論文で使用した3つのテンプレートの設定手順を提供します。AI Scientistの実験を実行する前に、興味のあるテンプレートの設定手順を完了してください。
+
+### NanoGPTテンプレート
+
+**説明:** このテンプレートは、トランスフォーマーベースの自己回帰次トークン予測タスクを調査します。
+
+**設定手順:**
+
+1. **データの準備:**
+
+   ```bash
+   python data/enwik8/prepare.py
+   python data/shakespeare_char/prepare.py
+   python data/text8/prepare.py
+   ```
+
+2. **ベースラインランの作成（マシン依存）:**
+
+   ```bash
+   # NanoGPTベースラインランの設定
+   # 注: まず上記の準備スクリプトを実行する必要があります！
+   cd templates/nanoGPT
+   python experiment.py --out_dir run_0
+   python plot.py
+   ```
+
+### 2D Diffusionテンプレート
+
+**説明:** このテンプレートは、低次元データセットでの拡散生成モデルの性能向上を研究します。
+
+**設定手順:**
+
+1. **依存関係のインストール:**
+
+   ```bash
+   # 2D Diffusionの設定
+   git clone https://github.com/gregversteeg/NPEET.git
+   cd NPEET
+   pip install .
+   pip install scikit-learn
+   ```
+
+2. **ベースラインランの作成:**
+
+   ```bash
+   # 2D Diffusionベースラインランの設定
+   cd templates/2d_diffusion
+   python experiment.py --out_dir run_0
+   python plot.py
+   ```
+
+### Grokkingテンプレート
+
+**説明:** このテンプレートは、ディープニューラルネットワークにおける一般化と学習速度に関する質問を調査します。
+
+**設定手順:**
+
+1. **依存関係のインストール:**
+
+   ```bash
+   # Grokkingの設定
+   pip install einops
+   ```
+
+2. **ベースラインランの作成:**
+
+   ```bash
+   # Grokkingベースラインランの設定
+   cd templates/grokking
+   python experiment.py --out_dir run_0
+   python plot.py
+   ```
+
+## AI Scientistの論文生成実験を実行する
+
+**注:** これらの実験を実行する前に、上記の設定手順を完了してください。
+
+```bash
+conda activate ai_scientist
+# 論文生成を実行
+python launch_scientist.py --model "gpt-4o-2024-05-13" --experiment nanoGPT_lite --num-ideas 2
+python launch_scientist.py --model "claude-3-5-sonnet-20241022" --experiment nanoGPT_lite --num-ideas 2
+```
+
+複数のGPUを持っている場合は、`--parallel`オプションを使用してアイデアを複数のGPUに並列化します。
+
+## LLM生成の論文レビューを取得する
+
+```python
+import openai
+from ai_scientist.perform_review import load_paper, perform_review
+
+client = openai.OpenAI()
+model = "gpt-4o-2024-05-13"
+
+# PDFファイルから論文を読み込む（生テキスト）
+paper_txt = load_paper("report.pdf")
+
+# レビューディクショナリを取得
+review = perform_review(
+    paper_txt,
+    model,
+    client,
+    num_reflections=5,
+    num_fs_examples=1,
+    num_reviews_ensemble=5,
+    temperature=0.1,
+)
+
+# レビュー結果を確認
+review["Overall"]    # 全体スコア（1-10）
+review["Decision"]   # 'Accept'または'Reject'
+review["Weaknesses"] # 弱点のリスト（文字列）
+```
+
+バッチ分析を実行するには：
+
+```bash
+cd review_iclr_bench
+python iclr_analysis.py --num_reviews 500 --batch_size 100 --num_fs_examples 1 --num_reflections 5 --temperature 0.1 --num_reviews_ensemble 5
+```
+
+## 独自のテンプレートを作成する
+
+**The AI Scientist**に探求してほしい研究分野がある場合は、独自のテンプレートを作成するのは簡単です。一般的に、既存のテンプレートの構造に従います。これらは次のように構成されています：
+
+- `experiment.py` — これは、コアコンテンツが含まれるメインスクリプトです。`--out_dir`引数を取り、実行結果を保存するフォルダを指定します。
+- `plot.py` — このスクリプトは、`run`フォルダから情報を取得し、プロットを作成します。コードは明確で編集しやすいものであるべきです。
+- `prompt.json` — テンプレートに関する情報をここに記載します。
+- `seed_ideas.json` — ここに例のアイデアを配置します。例がなくてもアイデアを生成し、最良のものを1つか2つ選んでここに配置することもできます。
+- `latex/template.tex` — 私たちのLaTeXフォルダを使用することをお勧めしますが、事前に読み込まれた引用を期待されるものに置き換えることを確認してください。
+
+新しいテンプレートを機能させるための鍵は、基本的なファイル名と出力JSONを既存の形式に一致させることです。それ以外のすべては自由に変更できます。
+また、`template.tex`ファイルがテンプレートに適した正しい引用スタイル/基本プロットを使用するように更新されていることを確認する必要があります。
+
+### コミュニティが提供するテンプレート
+
+私たちは、新しいテンプレートの形でのコミュニティの貢献を歓迎します。これらは私たちによって維持されていませんが、他の人々にあなたのテンプレートを紹介することを喜んでいます。以下に、コミュニティが提供するテンプレートとそのプルリクエスト（PR）へのリンクを示します：
+
+- 感染症モデリング（`seir`） - [PR #137](https://github.com/SakanaAI/AI-Scientist/pull/137)
+- MobileNetV3を使用した画像分類（`mobilenetV3`） - [PR #141](https://github.com/SakanaAI/AI-Scientist/pull/141)
+- Sketch RNN（`sketch_rnn`） - [PR #143](https://github.com/SakanaAI/AI-Scientist/pull/143)
+
+*このセクションはコミュニティの貢献のために予約されています。テンプレートをリストに追加するためにプルリクエストを提出してください！PRの説明にテンプレートを説明し、生成された論文の例も示してください。*
+
+## テンプレートリソース
+
+私たちは、他のリポジトリからのコードを多用している3つのテンプレートを提供しています。以下にクレジットを示します：
+
+- **NanoGPTテンプレート**は、[NanoGPT](https://github.com/karpathy/nanoGPT)とこの[PR](https://github.com/karpathy/nanoGPT/pull/254)のコードを使用しています。
+- **2D Diffusionテンプレート**は、[tiny-diffusion](https://github.com/tanelp/tiny-diffusion)、[ema-pytorch](https://github.com/lucidrains/ema-pytorch)、および[Datasaur](https://www.research.autodesk.com/publications/same-stats-different-graphs/)のコードを使用しています。
+- **Grokkingテンプレート**は、[Sea-Snell/grokking](https://github.com/Sea-Snell/grokking)および[danielmamay/grokking](https://github.com/danielmamay/grokking)のコードを使用しています。
+
+オープンソースモデルとパッケージの開発者に感謝し、その作業を利用できるようにしてくれたことに感謝します。
+
+## AI Scientistの引用
+
+**The AI Scientist**を研究に使用する場合は、次のように引用してください：
+
+```
+@article{lu2024aiscientist,
+  title={The {AI} {S}cientist: Towards Fully Automated Open-Ended Scientific Discovery},
+  author={Lu, Chris and Lu, Cong and Lange, Robert Tjarko and Foerster, Jakob and Clune, Jeff and Ha, David},
+  journal={arXiv preprint arXiv:2408.06292},
+  year={2024}
+}
+```
+
+## よくある質問
+
+The AI Scientistに関する質問がある場合は、まず私たちの論文を読むことをお勧めします。
+
+**The AI Scientistを実行する際にファイルが見つからないのはなぜですか？**
+
+メインの実験スクリプトを実行する前に、すべての設定と準備手順を完了していることを確認してください。
+
+**PDFやレビューが生成されていないのはなぜですか？**
+
+The AI Scientistは、テンプレート、基礎となるモデル、およびアイデアの複雑さに応じて、成功率が異なります。私たちのメインの論文を参照することをお勧めします。最も高い成功率はClaude Sonnet 3.5で観察されます。レビューはGPT-4oで行うのが最適です。他のすべてのモデルは、ポジティブバイアスや必要な出力に従わない問題があります。
+
+**生成されるアイデアのコストはどれくらいですか？**
+
+通常、Claude Sonnet 3.5で1論文あたり15ドル未満です。よりコスト効果の高いアプローチとして、DeepSeek Coder V2をお勧めします。新しいモデルを探す良い場所は、[Aiderリーダーボード](https://aider.chat/docs/leaderboards/)です。
+
+**書き起こしに関連する基本的な会議フォーマットを変更するにはどうすればよいですか？**
+
+各テンプレートに含まれる基本的な`template.tex`ファイルを変更します。
+
+**異なる分野の研究をThe AI Scientistで実行するにはどうすればよいですか？**
+
+異なるテンプレートの指示を参照してください。この現在のバージョンでは、コードで表現できるアイデアに制限されています。ただし、この制限を解除することは、将来のエキサイティングな作業を表しています！ :)
+
+**新しい基礎モデルのサポートを追加するにはどうすればよいですか？**
+
+新しい基礎モデルのサポートを追加するには、`ai_scientist/llm.py`を変更することができます。**The AI Scientist**には、GPT-4レベルよりも大幅に弱いモデルを使用することはお勧めしません。
+
+**なぜベースラインランを自分で実行する必要があるのですか？**
+
+これらは`run_0`として表示され、ハードウェアの違いによる実行時間の比較のために、**The AI Scientist**を実行する各マシンで実行する必要があります。
+
+**Semantic Scholar APIにアクセスする際に問題がある場合はどうすればよいですか？**
+
+私たちは、アイデアの新規性を確認し、論文の書き起こしのための引用を収集するためにSemantic Scholar APIを使用しています。APIキーがない場合やAPIへのアクセスが遅い場合は、これらのフェーズをスキップできるかもしれません。
+
+## コンテナ化
+
+`experimental/Dockerfile`に、コンテナ化の取り組みに役立つ[コミュニティが提供する](https://github.com/SakanaAI/AI-Scientist/pull/21)Dockerイメージを含めています。
+
+このイメージを次のように使用できます：
+
+```bash
+# エンドポイントスクリプト
+docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -v `pwd`/templates:/app/AI-Scientist/templates <AI_SCIENTIST_IMAGE> \
+  --model gpt-4o-2024-05-13 \
+  --experiment 2d_diffusion \
+  --num-ideas 2
+```
+
+```bash
+# インタラクティブ
+docker run -it -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  --entrypoint /bin/bash \
+  <AI_SCIENTIST_IMAGE>
+```
+
+## スターヒストリー
 
 [![Star History Chart](https://api.star-history.com/svg?repos=SakanaAI/AI-Scientist&type=Date)](https://star-history.com/#SakanaAI/AI-Scientist&Date)

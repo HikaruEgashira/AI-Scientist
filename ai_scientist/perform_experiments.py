@@ -26,16 +26,16 @@ YOUR PROPOSED CHANGE MUST USE THIS COMMAND FORMAT, DO NOT ADD ADDITIONAL COMMAND
 You can then implement the next thing on your list."""
 
 
-# RUN EXPERIMENT
+# 実験を実行する関数
 def run_experiment(folder_name, run_num, timeout=7200):
     cwd = osp.abspath(folder_name)
-    # COPY CODE SO WE CAN SEE IT.
+    # コードをコピーして確認できるようにする
     shutil.copy(
         osp.join(folder_name, "experiment.py"),
         osp.join(folder_name, f"run_{run_num}.py"),
     )
 
-    # LAUNCH COMMAND
+    # コマンドを実行
     command = [
         "python",
         "experiment.py",
@@ -84,10 +84,10 @@ If you are finished with experiments, respond with 'ALL_COMPLETED'."""
         return 1, next_prompt
 
 
-# RUN PLOTTING
+# プロットを実行する関数
 def run_plotting(folder_name, timeout=600):
     cwd = osp.abspath(folder_name)
-    # LAUNCH COMMAND
+    # コマンドを実行
     command = [
         "python",
         "plot.py",
@@ -112,9 +112,9 @@ def run_plotting(folder_name, timeout=600):
         return 1, next_prompt
 
 
-# PERFORM EXPERIMENTS
+# 実験を実行する関数
 def perform_experiments(idea, folder_name, coder, baseline_results) -> bool:
-    ## RUN EXPERIMENT
+    ## 実験を実行
     current_iter = 0
     run = 1
     next_prompt = coder_prompt.format(

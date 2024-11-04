@@ -69,10 +69,9 @@ NEW IDEA JSON:
 ```
 
 If there is nothing to improve, simply repeat the previous JSON EXACTLY after the thought and include "I am done" at the end of the thoughts but before the JSON.
-ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES."""
+ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES。"""
 
-
-# GENERATE IDEAS
+# アイデアを生成する関数
 def generate_ideas(
         base_dir,
         client,
@@ -82,18 +81,18 @@ def generate_ideas(
         num_reflections=5,
 ):
     if skip_generation:
-        # Load existing ideas from file
+        # 既存のアイデアをファイルから読み込む
         try:
             with open(osp.join(base_dir, "ideas.json"), "r") as f:
                 ideas = json.load(f)
-            print("Loaded existing ideas:")
+            print("既存のアイデアを読み込みました:")
             for idea in ideas:
                 print(idea)
             return ideas
         except FileNotFoundError:
-            print("No existing ideas found. Generating new ideas.")
+            print("既存のアイデアが見つかりません。新しいアイデアを生成します。")
         except json.JSONDecodeError:
-            print("Error decoding existing ideas. Generating new ideas.")
+            print("既存のアイデアのデコードエラー。新しいアイデアを生成します。")
 
     idea_str_archive = []
     with open(osp.join(base_dir, "seed_ideas.json"), "r") as f:
@@ -111,12 +110,12 @@ def generate_ideas(
 
     for _ in range(max_num_generations):
         print()
-        print(f"Generating idea {_ + 1}/{max_num_generations}")
+        print(f"アイデアを生成中 {_ + 1}/{max_num_generations}")
         try:
             prev_ideas_string = "\n\n".join(idea_str_archive)
 
             msg_history = []
-            print(f"Iteration 1/{num_reflections}")
+            print(f"反復 1/{num_reflections}")
             text, msg_history = get_response_from_llm(
                 idea_first_prompt.format(
                     task_description=prompt["task_description"],
@@ -129,15 +128,15 @@ def generate_ideas(
                 system_message=idea_system_prompt,
                 msg_history=msg_history,
             )
-            ## PARSE OUTPUT
+            ## 出力を解析
             json_output = extract_json_between_markers(text)
-            assert json_output is not None, "Failed to extract JSON from LLM output"
+            assert json_output is not None, "LLM出力からJSONの抽出に失敗しました"
             print(json_output)
 
-            # Iteratively improve task.
+            # アイデアを反復的に改善
             if num_reflections > 1:
                 for j in range(num_reflections - 1):
-                    print(f"Iteration {j + 2}/{num_reflections}")
+                    print(f"反復 {j + 2}/{num_reflections}")
                     text, msg_history = get_response_from_llm(
                         idea_reflection_prompt.format(
                             current_round=j + 2, num_reflections=num_reflections
@@ -147,23 +146,23 @@ def generate_ideas(
                         system_message=idea_system_prompt,
                         msg_history=msg_history,
                     )
-                    ## PARSE OUTPUT
+                    ## 出力を解析
                     json_output = extract_json_between_markers(text)
                     assert (
                             json_output is not None
-                    ), "Failed to extract JSON from LLM output"
+                    ), "LLM出力からJSONの抽出に失敗しました"
                     print(json_output)
 
                     if "I am done" in text:
-                        print(f"Idea generation converged after {j + 2} iterations.")
+                        print(f"アイデア生成は {j + 2} 回の反復後に収束しました。")
                         break
 
             idea_str_archive.append(json.dumps(json_output))
         except Exception as e:
-            print(f"Failed to generate idea: {e}")
+            print(f"アイデアの生成に失敗しました: {e}")
             continue
 
-    ## SAVE IDEAS
+    ## アイデアを保存
     ideas = []
     for idea_str in idea_str_archive:
         ideas.append(json.loads(idea_str))
@@ -174,7 +173,7 @@ def generate_ideas(
     return ideas
 
 
-# GENERATE IDEAS OPEN-ENDED
+# オープンエンドのアイデアを生成する関数
 def generate_next_idea(
         base_dir,
         client,
@@ -186,11 +185,11 @@ def generate_next_idea(
     idea_archive = prev_idea_archive
     original_archive_size = len(idea_archive)
 
-    print(f"Generating idea {original_archive_size + 1}")
+    print(f"アイデアを生成中 {original_archive_size + 1}")
 
     if len(prev_idea_archive) == 0:
-        print(f"First iteration, taking seed ideas")
-        # seed the archive on the first run with pre-existing ideas
+        print(f"最初の反復、シードアイデアを使用")
+        # 最初の実行時に事前存在するアイデアでアーカイブをシード
         with open(osp.join(base_dir, "seed_ideas.json"), "r") as f:
             seed_ideas = json.load(f)
         for seed_idea in seed_ideas[:1]:
@@ -210,7 +209,7 @@ def generate_next_idea(
                 prev_ideas_string = "\n\n".join(idea_strings)
 
                 msg_history = []
-                print(f"Iteration 1/{num_reflections}")
+                print(f"反復 1/{num_reflections}")
                 text, msg_history = get_response_from_llm(
                     idea_first_prompt.format(
                         task_description=prompt["task_description"],
@@ -228,15 +227,15 @@ Scores of 0 indicate the idea failed either during experimentation, writeup or r
                     system_message=idea_system_prompt,
                     msg_history=msg_history,
                 )
-                ## PARSE OUTPUT
+                ## 出力を解析
                 json_output = extract_json_between_markers(text)
-                assert json_output is not None, "Failed to extract JSON from LLM output"
+                assert json_output is not None, "LLM出力からJSONの抽出に失敗しました"
                 print(json_output)
 
-                # Iteratively improve task.
+                # アイデアを反復的に改善
                 if num_reflections > 1:
                     for j in range(num_reflections - 1):
-                        print(f"Iteration {j + 2}/{num_reflections}")
+                        print(f"反復 {j + 2}/{num_reflections}")
                         text, msg_history = get_response_from_llm(
                             idea_reflection_prompt.format(
                                 current_round=j + 2, num_reflections=num_reflections
@@ -246,26 +245,26 @@ Scores of 0 indicate the idea failed either during experimentation, writeup or r
                             system_message=idea_system_prompt,
                             msg_history=msg_history,
                         )
-                        ## PARSE OUTPUT
+                        ## 出力を解析
                         json_output = extract_json_between_markers(text)
                         assert (
                                 json_output is not None
-                        ), "Failed to extract JSON from LLM output"
+                        ), "LLM出力からJSONの抽出に失敗しました"
                         print(json_output)
 
                         if "I am done" in text:
                             print(
-                                f"Idea generation converged after {j + 2} iterations."
+                                f"アイデア生成は {j + 2} 回の反復後に収束しました。"
                             )
                             break
 
                 idea_archive.append(json_output)
                 break
             except Exception as e:
-                print(f"Failed to generate idea: {e}")
+                print(f"アイデアの生成に失敗しました: {e}")
                 continue
 
-    ## SAVE IDEAS
+    ## アイデアを保存
     with open(osp.join(base_dir, "ideas.json"), "w") as f:
         json.dump(idea_archive, f, indent=4)
 
@@ -274,8 +273,8 @@ Scores of 0 indicate the idea failed either during experimentation, writeup or r
 
 def on_backoff(details):
     print(
-        f"Backing off {details['wait']:0.1f} seconds after {details['tries']} tries "
-        f"calling function {details['target'].__name__} at {time.strftime('%X')}"
+        f"関数 {details['target'].__name__} の呼び出しで {details['tries']} 回の試行後に {details['wait']:0.1f} 秒間のバックオフ "
+        f" {time.strftime('%X')} に"
     )
 
 
@@ -294,10 +293,10 @@ def search_for_papers(query, result_limit=10) -> Union[None, List[Dict]]:
             "fields": "title,authors,venue,year,abstract,citationStyles,citationCount",
         },
     )
-    print(f"Response Status Code: {rsp.status_code}")
+    print(f"レスポンスステータスコード: {rsp.status_code}")
     print(
-        f"Response Content: {rsp.text[:500]}"
-    )  # Print the first 500 characters of the response content
+        f"レスポンスコンテンツ: {rsp.text[:500]}"
+    )  # レスポンスコンテンツの最初の500文字を表示
     rsp.raise_for_status()
     results = rsp.json()
     total = results["total"]
@@ -309,16 +308,16 @@ def search_for_papers(query, result_limit=10) -> Union[None, List[Dict]]:
     return papers
 
 
-novelty_system_msg = """You are an ambitious AI PhD student who is looking to publish a paper that will contribute significantly to the field.
-You have an idea and you want to check if it is novel or not. I.e., not overlapping significantly with existing literature or already well explored.
-Be a harsh critic for novelty, ensure there is a sufficient contribution in the idea for a new conference or workshop paper.
-You will be given access to the Semantic Scholar API, which you may use to survey the literature and find relevant papers to help you make your decision.
-The top 10 results for any search query will be presented to you with the abstracts.
+novelty_system_msg = """あなたは、フィールドに大きく貢献する論文を発表しようとしている意欲的なAI博士課程の学生です。
+アイデアが新規かどうかを確認したいと考えています。つまり、既存の文献と大きく重複していないか、すでに十分に探求されているかどうかを確認します。
+新規性に対して厳しい批評家であり、新しい会議やワークショップの論文に十分な貢献があることを確認してください。
+Semantic Scholar APIにアクセスできるようになり、文献を調査し、アイデアの決定を支援するための関連論文を見つけることができます。
+検索クエリの上位10件の結果が、要約とともに提示されます。
 
-You will be given {num_rounds} to decide on the paper, but you do not need to use them all.
-At any round, you may exit early and decide on the novelty of the idea.
-Decide a paper idea is novel if after sufficient searching, you have not found a paper that significantly overlaps with your idea.
-Decide a paper idea is not novel, if you have found a paper that significantly overlaps with your idea.
+{num_rounds} 回の決定を行うことができますが、すべてを使用する必要はありません。
+任意のラウンドで早期に終了し、アイデアの新規性について決定することができます。
+十分な検索を行った後、アイデアが既存の論文と大きく重複していない場合、新規であると判断します。
+アイデアが既存の論文と大きく重複している場合、新規でないと判断します。
 
 {task_description}
 <experiment.py>
@@ -326,19 +325,19 @@ Decide a paper idea is not novel, if you have found a paper that significantly o
 </experiment.py>
 """
 
-novelty_prompt = '''Round {current_round}/{num_rounds}.
-You have this idea:
+novelty_prompt = '''ラウンド {current_round}/{num_rounds}.
+このアイデアがあります:
 
 """
 {idea}
 """
 
-The results of the last query are (empty on first round):
+最後のクエリの結果は次のとおりです（最初のラウンドでは空です）:
 """
 {last_query_results}
 """
 
-Respond in the following format:
+次の形式で応答してください:
 
 THOUGHT:
 <THOUGHT>
@@ -348,14 +347,14 @@ RESPONSE:
 <JSON>
 ```
 
-In <THOUGHT>, first briefly reason over the idea and identify any query that could help you make your decision.
-If you have made your decision, add "Decision made: novel." or "Decision made: not novel." to your thoughts.
+<THOUGHT>では、まずアイデアを簡単に考察し、決定を支援するためのクエリを特定します。
+決定を下した場合は、"Decision made: novel." または "Decision made: not novel." を考えに追加します。
 
-In <JSON>, respond in JSON format with ONLY the following field:
-- "Query": An optional search query to search the literature (e.g. attention is all you need). You must make a query if you have not decided this round.
+<JSON>では、次のフィールドのみを含むJSON形式で応答します:
+- "Query": 文献を検索するためのオプションの検索クエリ（例: attention is all you need）。このラウンドで決定していない場合はクエリを作成する必要があります。
 
-A query will work best if you are able to recall the exact name of the paper you are looking for, or the authors.
-This JSON will be automatically parsed, so ensure the format is precise.'''
+クエリは、探している論文の正確な名前や著者を思い出すことができる場合に最適に機能します。
+このJSONは自動的に解析されるため、形式が正確であることを確認してください。'''
 
 
 def check_idea_novelty(
@@ -373,10 +372,10 @@ def check_idea_novelty(
 
     for idx, idea in enumerate(ideas):
         if "novel" in idea:
-            print(f"Skipping idea {idx}, already checked.")
+            print(f"アイデア {idx} をスキップします。すでに確認済みです。")
             continue
 
-        print(f"\nChecking novelty of idea {idx}: {idea['Name']}")
+        print(f"\nアイデア {idx} の新規性を確認中: {idea['Name']}")
 
         novel = False
         msg_history = []
@@ -401,27 +400,27 @@ def check_idea_novelty(
                     msg_history=msg_history,
                 )
                 if "decision made: novel" in text.lower():
-                    print("Decision made: novel after round", j)
+                    print("ラウンド後に決定: 新規", j)
                     novel = True
                     break
                 if "decision made: not novel" in text.lower():
-                    print("Decision made: not novel after round", j)
+                    print("ラウンド後に決定: 新規でない", j)
                     break
 
-                ## PARSE OUTPUT
+                ## 出力を解析
                 json_output = extract_json_between_markers(text)
-                assert json_output is not None, "Failed to extract JSON from LLM output"
+                assert json_output is not None, "LLM出力からJSONの抽出に失敗しました"
 
-                ## SEARCH FOR PAPERS
+                ## 論文を検索
                 query = json_output["Query"]
                 papers = search_for_papers(query, result_limit=10)
                 if papers is None:
-                    papers_str = "No papers found."
+                    papers_str = "論文が見つかりませんでした。"
 
                 paper_strings = []
                 for i, paper in enumerate(papers):
                     paper_strings.append(
-                        """{i}: {title}. {authors}. {venue}, {year}.\nNumber of citations: {cites}\nAbstract: {abstract}""".format(
+                        """{i}: {title}. {authors}. {venue}, {year}.\n引用数: {cites}\n要約: {abstract}""".format(
                             i=i,
                             title=paper["title"],
                             authors=paper["authors"],
@@ -434,12 +433,12 @@ def check_idea_novelty(
                 papers_str = "\n\n".join(paper_strings)
 
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"エラー: {e}")
                 continue
 
         idea["novel"] = novel
 
-    # Save results to JSON file
+    # 結果をJSONファイルに保存
     results_file = osp.join(base_dir, "ideas.json")
     with open(results_file, "w") as f:
         json.dump(ideas, f, indent=4)
@@ -452,34 +451,34 @@ if __name__ == "__main__":
     NUM_REFLECTIONS = 5
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate AI scientist ideas")
-    # add type of experiment (nanoGPT, Boston, etc.)
+    parser = argparse.ArgumentParser(description="AI科学者のアイデアを生成する")
+    # 実験の種類を追加 (nanoGPT, Boston, etc.)
     parser.add_argument(
         "--experiment",
         type=str,
         default="nanoGPT",
-        help="Experiment to run AI Scientist on.",
+        help="AI Scientistを実行する実験。",
     )
     parser.add_argument(
         "--model",
         type=str,
         default="gpt-4o-2024-05-13",
         choices=AVAILABLE_LLMS,
-        help="Model to use for AI Scientist.",
+        help="AI Scientistに使用するモデル。",
     )
     parser.add_argument(
         "--skip-idea-generation",
         action="store_true",
-        help="Skip idea generation and use existing ideas.",
+        help="アイデア生成をスキップし、既存のアイデアを使用します。",
     )
     parser.add_argument(
         "--check-novelty",
         action="store_true",
-        help="Check novelty of ideas.",
+        help="アイデアの新規性を確認します。",
     )
     args = parser.parse_args()
 
-    # Create client
+    # クライアントを作成
     client, client_model = create_client(args.model)
 
     base_dir = osp.join("templates", args.experiment)
