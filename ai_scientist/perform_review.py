@@ -10,22 +10,27 @@ from ai_scientist.llm import (
     extract_json_between_markers,
 )
 
+# レビュアーのシステムプロンプトの基本
 reviewer_system_prompt_base = (
-    "You are an AI researcher who is reviewing a paper that was submitted to a prestigious ML venue."
-    "Be critical and cautious in your decision."
+    "あなたは、著名なML会議に提出された論文をレビューしているAI研究者です。"
+    "慎重かつ批判的に判断してください。"
 )
 
+# 否定的なレビュアーのシステムプロンプト
 reviewer_system_prompt_neg = (
     reviewer_system_prompt_base
-    + "If a paper is bad or you are unsure, give it bad scores and reject it."
-)
-reviewer_system_prompt_pos = (
-    reviewer_system_prompt_base
-    + "If a paper is good or you are unsure, give it good scores and accept it."
+    + "論文が悪い場合や不明な場合は、低いスコアを付けて拒否してください。"
 )
 
+# 肯定的なレビュアーのシステムプロンプト
+reviewer_system_prompt_pos = (
+    reviewer_system_prompt_base
+    + "論文が良い場合や不明な場合は、高いスコアを付けて受け入れてください。"
+)
+
+# テンプレートの指示
 template_instructions = """
-Respond in the following format:
+以下の形式で応答してください:
 
 THOUGHT:
 <THOUGHT>
@@ -35,89 +40,90 @@ REVIEW JSON:
 <JSON>
 ```
 
-In <THOUGHT>, first briefly discuss your intuitions and reasoning for the evaluation.
-Detail your high-level arguments, necessary choices and desired outcomes of the review.
-Do not make generic comments here, but be specific to your current paper.
-Treat this as the note-taking phase of your review.
+<THOUGHT>では、評価の直感と理由を簡単に説明します。
+高レベルの議論、必要な選択肢、レビューの望ましい結果を詳細に説明します。
+ここでは一般的なコメントをせず、現在の論文に特化した具体的なコメントをしてください。
+これをレビューのメモ取りフェーズと考えてください。
 
-In <JSON>, provide the review in JSON format with the following fields in the order:
-- "Summary": A summary of the paper content and its contributions.
-- "Strengths": A list of strengths of the paper.
-- "Weaknesses": A list of weaknesses of the paper.
-- "Originality": A rating from 1 to 4 (low, medium, high, very high).
-- "Quality": A rating from 1 to 4 (low, medium, high, very high).
-- "Clarity": A rating from 1 to 4 (low, medium, high, very high).
-- "Significance": A rating from 1 to 4 (low, medium, high, very high).
-- "Questions": A set of clarifying questions to be answered by the paper authors.
-- "Limitations": A set of limitations and potential negative societal impacts of the work.
-- "Ethical Concerns": A boolean value indicating whether there are ethical concerns.
-- "Soundness": A rating from 1 to 4 (poor, fair, good, excellent).
-- "Presentation": A rating from 1 to 4 (poor, fair, good, excellent).
-- "Contribution": A rating from 1 to 4 (poor, fair, good, excellent).
-- "Overall": A rating from 1 to 10 (very strong reject to award quality).
-- "Confidence": A rating from 1 to 5 (low, medium, high, very high, absolute).
-- "Decision": A decision that has to be one of the following: Accept, Reject.
+<JSON>では、次のフィールドを順番に含むJSON形式でレビューを提供します:
+- "Summary": 論文の内容と貢献の要約。
+- "Strengths": 論文の強みのリスト。
+- "Weaknesses": 論文の弱みのリスト。
+- "Originality": 1から4の評価（低、中、高、非常に高い）。
+- "Quality": 1から4の評価（低、中、高、非常に高い）。
+- "Clarity": 1から4の評価（低、中、高、非常に高い）。
+- "Significance": 1から4の評価（低、中、高、非常に高い）。
+- "Questions": 著者に回答を求める明確な質問のセット。
+- "Limitations": 研究の限界と潜在的な負の社会的影響のセット。
+- "Ethical Concerns": 倫理的懸念があるかどうかを示すブール値。
+- "Soundness": 1から4の評価（低、公平、良い、優れた）。
+- "Presentation": 1から4の評価（低、公平、良い、優れた）。
+- "Contribution": 1から4の評価（低、公平、良い、優れた）。
+- "Overall": 1から10の評価（非常に強い拒否から受賞品質まで）。
+- "Confidence": 1から5の評価（低、中、高、非常に高い、絶対的）。
+- "Decision": 受け入れまたは拒否のいずれかの決定。
 
-For the "Decision" field, don't use Weak Accept, Borderline Accept, Borderline Reject, or Strong Reject. Instead, only use Accept or Reject.
-This JSON will be automatically parsed, so ensure the format is precise.
+"Decision"フィールドでは、弱い受け入れ、境界線の受け入れ、境界線の拒否、強い拒否を使用しないでください。代わりに、受け入れまたは拒否のみを使用してください。
+このJSONは自動的に解析されるため、形式が正確であることを確認してください。
 """
 
+# NeurIPSのレビュー形式
 neurips_form = (
     """
-## Review Form
-Below is a description of the questions you will be asked on the review form for each paper and some guidelines on what to consider when answering these questions.
-When writing your review, please keep in mind that after decisions have been made, reviews and meta-reviews of accepted papers and opted-in rejected papers will be made public. 
+## レビュー形式
+以下は、各論文に対してレビュー形式で尋ねられる質問の説明と、これらの質問に回答する際に考慮すべきガイドラインです。
+レビューを書く際には、決定が行われた後、受け入れられた論文とオプトインされた拒否された論文のレビューとメタレビューが公開されることを念頭に置いてください。
 
-1. Summary: Briefly summarize the paper and its contributions. This is not the place to critique the paper; the authors should generally agree with a well-written summary.
-  - Strengths and Weaknesses: Please provide a thorough assessment of the strengths and weaknesses of the paper, touching on each of the following dimensions:
-  - Originality: Are the tasks or methods new? Is the work a novel combination of well-known techniques? (This can be valuable!) Is it clear how this work differs from previous contributions? Is related work adequately cited
-  - Quality: Is the submission technically sound? Are claims well supported (e.g., by theoretical analysis or experimental results)? Are the methods used appropriate? Is this a complete piece of work or work in progress? Are the authors careful and honest about evaluating both the strengths and weaknesses of their work
-  - Clarity: Is the submission clearly written? Is it well organized? (If not, please make constructive suggestions for improving its clarity.) Does it adequately inform the reader? (Note that a superbly written paper provides enough information for an expert reader to reproduce its results.)
-  - Significance: Are the results important? Are others (researchers or practitioners) likely to use the ideas or build on them? Does the submission address a difficult task in a better way than previous work? Does it advance the state of the art in a demonstrable way? Does it provide unique data, unique conclusions about existing data, or a unique theoretical or experimental approach?
+1. 要約: 論文とその貢献を簡単に要約してください。ここは論文を批判する場所ではありません。著者はよく書かれた要約に一般的に同意するはずです。
+  - 強みと弱み: 論文の強みと弱みを各次元に触れながら徹底的に評価してください:
+  - 独創性: タスクや方法は新しいですか？よく知られた技術の新しい組み合わせですか？（これは価値があります！）この作業が以前の貢献とどのように異なるかが明確ですか？関連する作業は適切に引用されていますか？
+  - 質: 提出物は技術的に健全ですか？主張は理論的分析や実験結果によって十分に裏付けられていますか？使用される方法は適切ですか？これは完全な作業ですか、それとも進行中の作業ですか？著者は自分の作業の強みと弱みを評価する際に慎重で正直ですか？
+  - 明確さ: 提出物は明確に書かれていますか？よく整理されていますか？（そうでない場合は、明確さを改善するための建設的な提案をしてください。）読者に十分な情報を提供していますか？（優れた論文は、専門家の読者がその結果を再現するのに十分な情報を提供します。）
+  - 重要性: 結果は重要ですか？他の研究者や実務者がアイデアを使用したり、それに基づいて構築する可能性はありますか？提出物は以前の作業よりも優れた方法で困難なタスクに取り組んでいますか？それは実証可能な方法で最先端を進めていますか？それは独自のデータ、既存データに関する��自の結論、または独自の理論的または実験的アプローチを提供していますか？
 
-2. Questions: Please list up and carefully describe any questions and suggestions for the authors. Think of the things where a response from the author can change your opinion, clarify a confusion or address a limitation. This can be very important for a productive rebuttal and discussion phase with the authors.  
+2. 質問: 著者に対する質問や提案をリストアップし、慎重に説明してください。著者からの回答が意見を変えたり、混乱を解消したり、制限を解決したりする可能性があることを考えてください。これは、著者との生産的な反論と議論のフェーズにとって非常に重要です。
 
-3. Limitations: Have the authors adequately addressed the limitations and potential negative societal impact of their work? If not, please include constructive suggestions for improvement.
-In general, authors should be rewarded rather than punished for being up front about the limitations of their work and any potential negative societal impact. You are encouraged to think through whether any critical points are missing and provide these as feedback for the authors.
+3. 限界: 著者は自分の作業の限界と潜在的な負の社会的影響に十分に対処していますか？そうでない場合は、改善のための建設的な提案を含めてください。
+一般的に、著者が自分の作業の限界と潜在的な負の社会的影響について率直であることを奨励し、それに対して罰するのではなく報いるべきです。欠けている重要な点があるかどうかを考え、それを著者へのフィードバックとして提供してください。
 
-4. Ethical concerns: If there are ethical issues with this paper, please flag the paper for an ethics review. For guidance on when this is appropriate, please review the NeurIPS ethics guidelines.
+4. 倫理的懸念: この論文に倫理的な問題がある場合は、倫理レビューのために論文をフラグしてください。これが適切な場合のガイダンスについては、NeurIPSの倫理ガイドラインを確認してください。
 
-5. Soundness: Please assign the paper a numerical rating on the following scale to indicate the soundness of the technical claims, experimental and research methodology and on whether the central claims of the paper are adequately supported with evidence.
-  4: excellent
-  3: good
-  2: fair
-  1: poor
+5. 健全性: 技術的な主張、実験および研究方法論の健全性、および論文の中心的な主張が十分に裏付けられているかどうかを示すために、次のスケールで論文に数値評価を付けてください。
+  4: 優れた
+  3: 良い
+  2: 公平
+  1: 低い
 
-6. Presentation: Please assign the paper a numerical rating on the following scale to indicate the quality of the presentation. This should take into account the writing style and clarity, as well as contextualization relative to prior work.
-  4: excellent
-  3: good
-  2: fair
-  1: poor
+6. プレゼンテーション: プレゼンテーションの質を示すために、次のスケールで論文に数値評価を付けてください。これには、執筆スタイルと明確さ、および以前の作業に対する文脈化が含まれます。
+  4: 優れた
+  3: 良い
+  2: 公平
+  1: 低い
 
-7. Contribution: Please assign the paper a numerical rating on the following scale to indicate the quality of the overall contribution this paper makes to the research area being studied. Are the questions being asked important? Does the paper bring a significant originality of ideas and/or execution? Are the results valuable to share with the broader NeurIPS community.
-  4: excellent
-  3: good
-  2: fair
-  1: poor
+7. 貢献: 研究分野に対する全体的な貢献の質を示すために、次のスケールで論文に数値評価を付けてください。質問は重要ですか？論文はアイデアや実行の独創性をもたらしていますか？結果はNeurIPSコミュニティと共有する価値がありますか？
+  4: 優れた
+  3: 良い
+  2: 公平
+  1: 低い
 
-8. Overall: Please provide an "overall score" for this submission. Choices: 
-  10: Award quality: Technically flawless paper with groundbreaking impact on one or more areas of AI, with exceptionally strong evaluation, reproducibility, and resources, and no unaddressed ethical considerations.
-  9: Very Strong Accept: Technically flawless paper with groundbreaking impact on at least one area of AI and excellent impact on multiple areas of AI, with flawless evaluation, resources, and reproducibility, and no unaddressed ethical considerations.
-  8: Strong Accept: Technically strong paper with, with novel ideas, excellent impact on at least one area of AI or high-to-excellent impact on multiple areas of AI, with excellent evaluation, resources, and reproducibility, and no unaddressed ethical considerations.
-  7: Accept: Technically solid paper, with high impact on at least one sub-area of AI or moderate-to-high impact on more than one area of AI, with good-to-excellent evaluation, resources, reproducibility, and no unaddressed ethical considerations.
-  6: Weak Accept: Technically solid, moderate-to-high impact paper, with no major concerns with respect to evaluation, resources, reproducibility, ethical considerations.
-  5: Borderline accept: Technically solid paper where reasons to accept outweigh reasons to reject, e.g., limited evaluation. Please use sparingly.
-  4: Borderline reject: Technically solid paper where reasons to reject, e.g., limited evaluation, outweigh reasons to accept, e.g., good evaluation. Please use sparingly.
-  3: Reject: For instance, a paper with technical flaws, weak evaluation, inadequate reproducibility and incompletely addressed ethical considerations.
-  2: Strong Reject: For instance, a paper with major technical flaws, and/or poor evaluation, limited impact, poor reproducibility and mostly unaddressed ethical considerations.
-  1: Very Strong Reject: For instance, a paper with trivial results or unaddressed ethical considerations
+8. 全体: この提出物に対する「全体スコア」を提供してください。選択肢:
+  10: 受賞品質: 技術的に欠陥のない論文で、AIの1つ以上の分野に画期的な影響を与え、評価、再現性、リソースが非常に強力であり、未解決の倫理的考慮事項がない。
+  9: 非常に強い受け入れ: 技術的に欠陥のない論文で、少なくとも1つのAI分野に画期的な影響を与え、複数のAI分野に優れた影響を与え、評価、リソース、再現性が完璧であり、未解決の倫理的考慮事項がない。
+  8: 強い受け入れ: 技術的に強力な論文で、新しいアイデアを持ち、少なくとも1つのAI分野に優れた影響を与え、複数のAI分野に高から非常に高い影響を与え、評価、リソース、再現性が優れており、未解決の倫理的考慮事項がない。
+  7: 受け入れ: 技術的に堅実な論文で、少なくとも1つのAIサブエリアに高い影響を与え、複数のAI分野に中から高い影響を与え、評価、リソース、再現性が良から優れており、未解決の倫理的考慮事項がない。
+  6: 弱い受け入れ: 技術的に堅実で、中から高い影響を持つ論文で、評価、リソース、再現性、倫理的考慮事項に関して大きな懸念がない。
+  5: 境界線の受け入れ: 技術的に堅実な論文で、受け入れる理由が拒否する理由を上回る場合（例: 限られた評価）。慎重に使用してください。
+  4: 境界線の拒否: 技術的に堅実な論文で、拒否する理由が受け入れる理由を上回る場合（例: 良い評価）。慎重に使用してください。
+  3: 拒否: 例えば、技術的な欠陥、弱い評価、不十分な再現性、未解決の倫理的考慮事項がある論文。
+  2: 強い拒否: 例えば、重大な技術的欠陥、評価の不十分さ、影響の限定、再現性の低さ、ほとんど未解決の倫理的考慮事項がある論文。
+  1: 非常に強い拒否: 例えば、些細な結果や未解決の倫理的考慮事項がある論文。
 
-9. Confidence:  Please provide a "confidence score" for your assessment of this submission to indicate how confident you are in your evaluation. Choices:
-  5: You are absolutely certain about your assessment. You are very familiar with the related work and checked the math/other details carefully.
-  4: You are confident in your assessment, but not absolutely certain. It is unlikely, but not impossible, that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work.
-  3: You are fairly confident in your assessment. It is possible that you did not understand some parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
-  2: You are willing to defend your assessment, but it is quite likely that you did not understand the central parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
-  1: Your assessment is an educated guess. The submission is not in your area or the submission was difficult to understand. Math/other details were not carefully checked.
+9. 自信: この提出物に対する評価の自信スコアを提供してください。選択肢:
+  5: 評価に絶対的な自信があります。関連する作業に非常に精通しており、数学/その他の詳細を慎重に確認しました。
+  4: 評価に自信がありますが、絶対的ではありません。提出物の一部を理解していない可能性や、関連する作業に精通していない可能性は低いですが、存在します。
+  3: 評価にかなりの自信があります。提出物の一部を理解していない可能性や、関連する作業に精通していない可能性があります。数学/その他の詳細は慎重に確認されていません。
+  2: 評価を擁護する意思はありますが、提出物の中心部分を理解していない可能性や、関連する作業に精通していない可能性が高いです。数学/その他の詳細は慎重に確認されていません。
+  1: 評価は教育的な推測です。提出物は自分の専門分野ではないか、理解が難しいものでした。数学/その他の詳細は慎重に確認されていません。
 """
     + template_instructions
 )
@@ -143,7 +149,7 @@ def perform_review(
         base_prompt = review_instruction_form
 
     base_prompt += f"""
-Here is the paper you are asked to review:
+ここにレビューするように求められた論文があります:
 ```
 {text}
 ```"""
@@ -156,7 +162,7 @@ Here is the paper you are asked to review:
             system_message=reviewer_system_prompt,
             print_debug=False,
             msg_history=msg_history,
-            # Higher temperature to encourage diversity.
+            # 多様性を促進するために高い温度設定
             temperature=0.75,
             n_responses=num_reviews_ensemble,
         )
@@ -165,15 +171,15 @@ Here is the paper you are asked to review:
             try:
                 parsed_reviews.append(extract_json_between_markers(rev))
             except Exception as e:
-                print(f"Ensemble review {idx} failed: {e}")
+                print(f"アンサンブルレビュー {idx} に失敗しました: {e}")
         parsed_reviews = [r for r in parsed_reviews if r is not None]
         review = get_meta_review(model, client, temperature, parsed_reviews)
 
-        # take first valid in case meta-reviewer fails
+        # メタレビュアーが失敗した場合、最初の有効なレビューを使用
         if review is None:
             review = parsed_reviews[0]
 
-        # Replace numerical scores with the average of the ensemble.
+        # 数値スコアをアンサンブルの平均値に置き換え
         for score, limits in [
             ("Originality", (1, 4)),
             ("Quality", (1, 4)),
@@ -191,14 +197,14 @@ Here is the paper you are asked to review:
                     scores.append(r[score])
             review[score] = int(round(np.mean(scores)))
 
-        # Rewrite the message history with the valid one and new aggregated review.
+        # 有効なレビューと新しい集計レビューでメッセージ履歴を再作成
         msg_history = msg_histories[0][:-1]
         msg_history += [
             {
                 "role": "assistant",
                 "content": f"""
 THOUGHT:
-I will start by aggregating the opinions of {num_reviews_ensemble} reviewers that I previously obtained.
+以前取得した{num_reviews_ensemble}人のレビュアーの意見を集約します。
 
 REVIEW JSON:
 ```json
@@ -231,7 +237,7 @@ REVIEW JSON:
                 temperature=temperature,
             )
             review = extract_json_between_markers(text)
-            assert review is not None, "Failed to extract JSON from LLM output"
+            assert review is not None, "LLM出力からJSONの抽出に失敗しました"
 
             if "I am done" in text:
                 # print(f"Review generation converged after {j + 2} iterations.")
@@ -243,15 +249,16 @@ REVIEW JSON:
         return review
 
 
-reviewer_reflection_prompt = """Round {current_round}/{num_reflections}.
-In your thoughts, first carefully consider the accuracy and soundness of the review you just created.
-Include any other factors that you think are important in evaluating the paper.
-Ensure the review is clear and concise, and the JSON is in the correct format.
-Do not make things overly complicated.
-In the next attempt, try and refine and improve your review.
-Stick to the spirit of the original review unless there are glaring issues.
+# レビュアーの反省プロンプト
+reviewer_reflection_prompt = """ラウンド {current_round}/{num_reflections}.
+考えの中で、まず作成したレビューの正確性と健全性を慎重に考慮してください。
+論文を評価する際に重要だと思う他の要素も含めてください。
+レビューが明確で簡潔であり、JSONが正しい形式であることを確認してください。
+物事を過度に複雑にしないでください。
+次の試行では、レビューを改善し、改善するように努めてください。
+重大な問題がない限り、元のレビューの精神に従ってください。
 
-Respond in the same format as before:
+以前と同じ形式で応答してください:
 THOUGHT:
 <THOUGHT>
 
@@ -260,8 +267,8 @@ REVIEW JSON:
 <JSON>
 ```
 
-If there is nothing to improve, simply repeat the previous JSON EXACTLY after the thought and include "I am done" at the end of the thoughts but before the JSON.
-ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES."""
+改善することがない場合は、単に前のJSONを正確に繰り返し、考えの最後に「I am done」を含めてください。
+変更を加えない場合にのみ「I am done」を含めてください。"""
 
 
 def load_paper(pdf_path, num_pages=None, min_size=100):
@@ -273,27 +280,27 @@ def load_paper(pdf_path, num_pages=None, min_size=100):
             min_pages = min(len(reader.pages), num_pages)
             text = pymupdf4llm.to_markdown(pdf_path, pages=list(range(min_pages)))
         if len(text) < min_size:
-            raise Exception("Text too short")
+            raise Exception("テキストが短すぎます")
     except Exception as e:
-        print(f"Error with pymupdf4llm, falling back to pymupdf: {e}")
+        print(f"pymupdf4llmでエラーが発生しました。pymupdfにフォールバックします: {e}")
         try:
-            doc = pymupdf.open(pdf_path)  # open a document
+            doc = pymupdf.open(pdf_path)  # ドキュメントを開く
             if num_pages:
                 doc = doc[:num_pages]
             text = ""
-            for page in doc:  # iterate the document pages
-                text = text + page.get_text()  # get plain text encoded as UTF-8
+            for page in doc:  # ドキュメントのページを反復処理
+                text = text + page.get_text()  # UTF-8としてエンコードされたプレーンテキストを取得
             if len(text) < min_size:
-                raise Exception("Text too short")
+                raise Exception("テキストが短すぎます")
         except Exception as e:
-            print(f"Error with pymupdf, falling back to pypdf: {e}")
+            print(f"pymupdfでエラーが発生しました。pypdfにフォールバックします: {e}")
             reader = PdfReader(pdf_path)
             if num_pages is None:
                 text = "".join(page.extract_text() for page in reader.pages)
             else:
                 text = "".join(page.extract_text() for page in reader.pages[:num_pages])
             if len(text) < min_size:
-                raise Exception("Text too short")
+                raise Exception("テキストが短すぎます")
 
     return text
 
@@ -304,7 +311,7 @@ def load_review(path):
     return loaded["review"]
 
 
-# get directory of this file
+# このファイルのディレクトリを取得
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 fewshot_papers = [
@@ -322,8 +329,8 @@ fewshot_reviews = [
 
 def get_review_fewshot_examples(num_fs_examples=1):
     fewshot_prompt = """
-Below are some sample reviews, copied from previous machine learning conferences.
-Note that while each review is formatted differently according to each reviewer's style, the reviews are well-structured and therefore easy to navigate.
+以下は、以前の機械学習会議からコピーされたサンプルレビューです。
+各レビューはレビュアーのスタイルに応じて異なる形式で書かれていますが、レビューはよく構造化されており、ナビゲートしやすいです。
 """
     for paper, review in zip(
         fewshot_papers[:num_fs_examples], fewshot_reviews[:num_fs_examples]
@@ -336,13 +343,13 @@ Note that while each review is formatted differently according to each reviewer'
             paper_text = load_paper(paper)
         review_text = load_review(review)
         fewshot_prompt += f"""
-Paper:
+論文:
 
 ```
 {paper_text}
 ```
 
-Review:
+レビュー:
 
 ```
 {review_text}
@@ -352,18 +359,19 @@ Review:
     return fewshot_prompt
 
 
-meta_reviewer_system_prompt = """You are an Area Chair at a machine learning conference.
-You are in charge of meta-reviewing a paper that was reviewed by {reviewer_count} reviewers.
-Your job is to aggregate the reviews into a single meta-review in the same format.
-Be critical and cautious in your decision, find consensus, and respect the opinion of all the reviewers."""
+# メタレビュアーのシステムプロンプト
+meta_reviewer_system_prompt = """あなたは機械学習会議のエリアチェアです。
+あなたは{reviewer_count}人のレビュアーによってレビューされた論文のメタレビューを担当しています。
+あなたの仕事は、レビューを1つのメタレビューに集約することです。
+慎重かつ批判的に判断し、コンセンサスを見つけ、すべてのレビュアーの意見を尊重してください。"""
 
 
 def get_meta_review(model, client, temperature, reviews):
-    # Write a meta-review from a set of individual reviews
+    # 個々のレビューのセットからメタレビューを作成
     review_text = ""
     for i, r in enumerate(reviews):
         review_text += f"""
-Review {i + 1}/{len(reviews)}:
+レビュー {i + 1}/{len(reviews)}:
 ```
 {json.dumps(r)}
 ```
@@ -384,12 +392,12 @@ Review {i + 1}/{len(reviews)}:
 
 
 def perform_improvement(review, coder):
-    improvement_prompt = '''The following review has been created for your research paper:
+    improvement_prompt = '''以下のレビューがあなたの研究論文に対して作成されました:
 """
 {review}
 """
 
-Improve the text using the review.'''.format(
+レビューを使用してテキストを改善してください。'''.format(
         review=json.dumps(review)
     )
     coder_out = coder.run(improvement_prompt)
